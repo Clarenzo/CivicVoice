@@ -1,0 +1,38 @@
+{
+    "name": "CivicVoice",
+    "version": "1.0.0",
+    "private": "true",
+    "description": "Public Complaints & Feedback Portal Kenya",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+        "dev:frontend": "npm run dev --workspace=apps/frontend",
+        "dev:backend": "npm run start:dev --workspace=apps/backend",
+        "build": "npm run build --workspaces",
+        "build:frontend": "npm run build --workspace=apps/frontend",
+        "build:backend": "npm run build --workspace=apps/backend",
+        "lint": "npm run lint --workspaces",
+        "test": "npm run test --workspaces",
+        "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+        "docker:down": "docker compose -f docker/docker-compose.yml down",
+        "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "typescript": "^5.4.5"
+    },
+    "engines": {
+        "node": ">=20.0.0",
+        "npm": ">=10.0.0"
+    },
+    "allowScripts": {
+        "prisma@5.22.0": true,
+        "@prisma/client@5.22.0": true,
+        "@prisma/engines@5.22.0": true,
+        "bcrypt@5.1.1": true,
+        "esbuild@0.21.5": true
+    }
+}

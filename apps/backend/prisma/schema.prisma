@@ -1,0 +1,306 @@
+// CivicVoice Database Schema
+
+// Prisma ORM Configuration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+enum Role {
+  CITIZEN
+  HANDLER
+  DEPARTMENT_ADMIN
+  AGENCY_ADMIN
+  SYSTEM_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String?     @unique
+  phone         String?     @unique
+  password      String?
+  name          String
+  nationalId    String?     @unique @map("national_id")
+  role          Role        @default(CITIZEN)
+  status        UserStatus  @default(ACTIVE)
+  emailVerified Boolean     @default(false) @map("email_verified")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  complaints      Complaint[]          @relation("SubmittedBy")
+  assignedTo      Complaint[]          @relation("AssignedTo")
+  statusChanges   StatusChange[]       @relation("ChangedBy")
+  feedback        Feedback[]
+  satisfactionRatings SatisfactionRating[]
+
+  // Auth
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// AGENCIES & DEPARTMENTS
+// ============================================
+
+model Agency {
+  id          String       @id @default(uuid())
+  name        String
+  code        String       @unique
+  description String?
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  departments Department[]
+
+  @@map("agencies")
+}
+
+model Department {
+  id           String      @id @default(uuid())
+  name         String
+  code         String      @unique
+  agencyId     String      @map("agency_id")
+  agency       Agency      @relation(fields: [agencyId], references: [id])
+  parentId     String?     @map("parent_id")
+  parent       Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children     Department[] @relation("DepartmentHierarchy")
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  categories   Category[]
+  complaints   Complaint[]
+
+  @@map("departments")
+}
+
+// ============================================
+// COMPLAINTS
+// ============================================
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  IN_PROGRESS
+  PENDING_INFO
+  ESCALATED
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Category {
+  id           String       @id @default(uuid())
+  name         String
+  nameSw       String       @map("name_sw")  // Swahili name
+  description  String?
+  departmentId String       @map("department_id")
+  department   Department   @relation(fields: [departmentId], references: [id])
+  parentId     String?      @map("parent_id")
+  parent       Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[]   @relation("CategoryHierarchy")
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  complaints   Complaint[]
+
+  @@map("categories")
+}
+
+model Complaint {
+  id              String          @id @default(uuid())
+  trackingNumber  String          @unique @map("tracking_number")  // e.g., CV-2026-XXXXXX
+  title           String
+  description     String
+  categoryId      String?         @map("category_id")
+  category        Category?       @relation(fields: [categoryId], references: [id])
+  departmentId    String?         @map("department_id")
+  department      Department?     @relation(fields: [departmentId], references: [id])
+
+  // Citizen info
+  citizenId       String?         @map("citizen_id")
+  citizen         User?           @relation("SubmittedBy", fields: [citizenId], references: [id])
+  submitterName   String?         @map("submitter_name")  // For anonymous
+  submitterEmail  String?         @map("submitter_email") // For anonymous
+  submitterPhone  String?         @map("submitter_phone") // For anonymous
+  isAnonymous     Boolean         @default(false) @map("is_anonymous")
+
+  // Location
+  location        String?         // Text description
+  latitude        Float?
+  longitude       Float?
+
+  // Status & Priority
+  status          ComplaintStatus @default(SUBMITTED)
+  priority        Priority        @default(MEDIUM)
+
+  // Assignment
+  assignedToId    String?         @map("assigned_to_id")
+  assignedTo      User?           @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  // Resolution
+  resolution      String?         // Resolution notes
+  resolvedAt      DateTime?       @map("resolved_at")
+
+  // Metadata
+  language        String          @default("en")  // en or sw
+  ipAddress       String?         @map("ip_address")
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  attachments     Attachment[]
+  statusChanges   StatusChange[]
+  feedback        Feedback?
+  satisfactionRating SatisfactionRating?
+
+  @@map("complaints")
+}
+
+model StatusChange {
+  id          String          @id @default(uuid())
+  complaintId String          @map("complaint_id")
+  complaint   Complaint       @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  status      ComplaintStatus
+  note        String?
+  changedById String          @map("changed_by_id")
+  changedBy   User            @relation("ChangedBy", fields: [changedById], references: [id])
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@map("complaint_status_history")
+}
+
+model Attachment {
+  id           String    @id @default(uuid())
+  complaintId  String    @map("complaint_id")
+  complaint    Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  fileName     String    @map("file_name")
+  originalName String    @map("original_name")
+  mimeType     String    @map("mime_type")
+  size         Int
+  url          String
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("attachments")
+}
+
+// ============================================
+// FEEDBACK & RATINGS
+// ============================================
+
+model Feedback {
+  id          String      @id @default(uuid())
+  complaintId String?     @unique @map("complaint_id")
+  complaint   Complaint?  @relation(fields: [complaintId], references: [id])
+  userId      String?     @map("user_id")
+  user        User?       @relation(fields: [userId], references: [id])
+  title       String
+  description String
+  category    String
+  language    String      @default("en")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("feedback")
+}
+
+model SatisfactionRating {
+  id          String    @id @default(uuid())
+  complaintId String    @unique @map("complaint_id")
+  complaint   Complaint @relation(fields: [complaintId], references: [id])
+  userId      String?   @map("user_id")
+  user        User?     @relation(fields: [userId], references: [id])
+  rating      Int       // 1-5
+  feedback    String?
+  recommend   Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("satisfaction_ratings")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String?            @map("user_id")
+  type      NotificationType
+  channel   String             // email address or phone number
+  subject   String?
+  message   String
+  status    NotificationStatus @default(PENDING)
+  sentAt    DateTime?          @map("sent_at")
+  error     String?
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
