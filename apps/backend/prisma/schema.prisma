@@ -1,5 +1,4 @@
 // CivicVoice Database Schema
-
 // Prisma ORM Configuration
 
 generator client {
@@ -43,9 +42,9 @@ model User {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  complaints      Complaint[]          @relation("SubmittedBy")
-  assignedTo      Complaint[]          @relation("AssignedTo")
-  statusChanges   StatusChange[]       @relation("ChangedBy")
+  complaints      Complaint[]      @relation("SubmittedBy")
+  assignedTo      Complaint[]      @relation("AssignedTo")
+  statusChanges   StatusChange[] @relation("ChangedBy")
   feedback        Feedback[]
   satisfactionRatings SatisfactionRating[]
 
@@ -151,40 +150,40 @@ model Complaint {
   description     String
   categoryId      String?         @map("category_id")
   category        Category?       @relation(fields: [categoryId], references: [id])
-  departmentId    String?         @map("department_id")
-  department      Department?     @relation(fields: [departmentId], references: [id])
-
+  departmentId    String?        @map("department_id")
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  
   // Citizen info
-  citizenId       String?         @map("citizen_id")
-  citizen         User?           @relation("SubmittedBy", fields: [citizenId], references: [id])
-  submitterName   String?         @map("submitter_name")  // For anonymous
-  submitterEmail  String?         @map("submitter_email") // For anonymous
-  submitterPhone  String?         @map("submitter_phone") // For anonymous
-  isAnonymous     Boolean         @default(false) @map("is_anonymous")
-
+  citizenId       String?        @map("citizen_id")
+  citizen         User?          @relation("SubmittedBy", fields: [citizenId], references: [id])
+  submitterName   String?        @map("submitter_name")  // For anonymous
+  submitterEmail  String?        @map("submitter_email") // For anonymous
+  submitterPhone  String?        @map("submitter_phone") // For anonymous
+  isAnonymous     Boolean        @default(false) @map("is_anonymous")
+  
   // Location
-  location        String?         // Text description
+  location        String?        // Text description
   latitude        Float?
   longitude       Float?
-
+  
   // Status & Priority
   status          ComplaintStatus @default(SUBMITTED)
   priority        Priority        @default(MEDIUM)
-
+  
   // Assignment
-  assignedToId    String?         @map("assigned_to_id")
-  assignedTo      User?           @relation("AssignedTo", fields: [assignedToId], references: [id])
-
+  assignedToId    String?        @map("assigned_to_id")
+  assignedTo      User?          @relation("AssignedTo", fields: [assignedToId], references: [id])
+  
   // Resolution
-  resolution      String?         // Resolution notes
-  resolvedAt      DateTime?       @map("resolved_at")
-
+  resolution      String?        // Resolution notes
+  resolvedAt      DateTime?      @map("resolved_at")
+  
   // Metadata
-  language        String          @default("en")  // en or sw
-  ipAddress       String?         @map("ip_address")
-
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  language        String         @default("en")  // en or sw
+  ipAddress        String?        @map("ip_address")
+  
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   // Relations
   attachments     Attachment[]
@@ -201,23 +200,23 @@ model StatusChange {
   complaint   Complaint       @relation(fields: [complaintId], references: [id], onDelete: Cascade)
   status      ComplaintStatus
   note        String?
-  changedById String          @map("changed_by_id")
-  changedBy   User            @relation("ChangedBy", fields: [changedById], references: [id])
+  changedById String?         @map("changed_by_id")
+  changedBy   User?           @relation("ChangedBy", fields: [changedById], references: [id])
   createdAt   DateTime        @default(now()) @map("created_at")
 
   @@map("complaint_status_history")
 }
 
 model Attachment {
-  id           String    @id @default(uuid())
-  complaintId  String    @map("complaint_id")
-  complaint    Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-  fileName     String    @map("file_name")
-  originalName String    @map("original_name")
-  mimeType     String    @map("mime_type")
-  size         Int
-  url          String
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id          String    @id @default(uuid())
+  complaintId String    @map("complaint_id")
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  fileName    String    @map("file_name")
+  originalName String   @map("original_name")
+  mimeType    String    @map("mime_type")
+  size        Int
+  url         String
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@map("attachments")
 }
@@ -227,16 +226,16 @@ model Attachment {
 // ============================================
 
 model Feedback {
-  id          String      @id @default(uuid())
-  complaintId String?     @unique @map("complaint_id")
-  complaint   Complaint?  @relation(fields: [complaintId], references: [id])
-  userId      String?     @map("user_id")
-  user        User?       @relation(fields: [userId], references: [id])
+  id          String    @id @default(uuid())
+  complaintId String?   @unique @map("complaint_id")
+  complaint   Complaint? @relation(fields: [complaintId], references: [id])
+  userId      String?   @map("user_id")
+  user        User?     @relation(fields: [userId], references: [id])
   title       String
   description String
   category    String
-  language    String      @default("en")
-  createdAt   DateTime    @default(now()) @map("created_at")
+  language    String    @default("en")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@map("feedback")
 }
@@ -272,16 +271,16 @@ enum NotificationStatus {
 }
 
 model Notification {
-  id        String             @id @default(uuid())
-  userId    String?            @map("user_id")
-  type      NotificationType
-  channel   String             // email address or phone number
-  subject   String?
-  message   String
-  status    NotificationStatus @default(PENDING)
-  sentAt    DateTime?          @map("sent_at")
-  error     String?
-  createdAt DateTime           @default(now()) @map("created_at")
+  id          String             @id @default(uuid())
+  userId      String?            @map("user_id")
+  type        NotificationType
+  channel     String             // email address or phone number
+  subject     String?
+  message     String
+  status      NotificationStatus @default(PENDING)
+  sentAt      DateTime?          @map("sent_at")
+  error       String?
+  createdAt   DateTime           @default(now()) @map("created_at")
 
   @@map("notifications")
 }

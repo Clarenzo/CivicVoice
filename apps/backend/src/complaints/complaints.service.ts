@@ -51,7 +51,7 @@ export class ComplaintsService {
                 complaintId: complaint.id,
                 status: "SUBMITTED",
                 note: "Complaint submitted",
-                changedById: userId || complaint.id,
+                changedById: userId ?? undefined,
             },
         });
 

@@ -12,6 +12,7 @@ import RegisterPage from "./pages/RegisterPage"
 //import DashboardLayout from "./components/DashboardLayout"
 import DashboardPage from "./pages/DashboardPage"
 import MyComplaintsPage from "./pages/MyComplaintsPage"
+import ComplaintDetailPage from "./pages/ComplaintDetailPage"
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -29,6 +30,7 @@ function App() {
       <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <HomePage />}>
         <Route index element={<DashboardPage />} />
         <Route path="complaints" element={<MyComplaintsPage />} />
+        <Route path="complaints/:id" element={<ComplaintDetailPage />}/>
       </Route>
     </Routes>
   )

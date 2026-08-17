@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "react-router-dom"
-import { FileText, Filter } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { FileText, Filter, Eye } from "lucide-react"
 import { complaintsApi } from "../lib/api"
 import { format } from "date-fns"
 
 export default function MyComplaintsPage() {
+  const navigate = useNavigate()
+
   const { data, isLoading } = useQuery({
     queryKey: ["my-complaints"],
     queryFn: () => complaintsApi.getAll().then(res => res.data),
@@ -49,6 +51,7 @@ export default function MyComplaintsPage() {
                   <th className="pb-3 font-medium text-gray-500">Title</th>
                   <th className="pb-3 font-medium text-gray-500">Status</th>
                   <th className="pb-3 font-medium text-gray-500">Priority</th>
+                  <th className="pb-3 font-medium text-gray-500">Priority</th>
                   <th className="pb-3 font-medium text-gray-500">Submitted</th>
                 </tr>
               </thead>
@@ -92,6 +95,15 @@ export default function MyComplaintsPage() {
                     </td>
                     <td className="py-4 text-gray-600">
                       {format(new Date(complaint.createdAt), "PPP")}
+                    </td>
+                    <td className="py-4">
+                      <button
+                        onClick={() => navigate(`/dashboard/complaints/${complaint.id}`)}
+                        className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
