@@ -177,6 +177,9 @@ model Complaint {
   // Resolution
   resolution      String?        // Resolution notes
   resolvedAt      DateTime?      @map("resolved_at")
+
+  // Soft delete
+  deletedAt       DateTime?      @map("deleted_at")
   
   // Metadata
   language        String         @default("en")  // en or sw

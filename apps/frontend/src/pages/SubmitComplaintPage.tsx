@@ -1,11 +1,11 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import toast from "react-hot-toast"
-import { ArrowRight, Upload, MapPin, AlertCircle } from "lucide-react"
-import { complaintsApi, categoriesApi } from "../lib/api"
+import { ArrowRight, ArrowLeft, MapPin, AlertCircle } from "lucide-react"
+import { complaintsApi } from "../lib/api"
 
 const complaintSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters").max(150),
@@ -39,11 +39,19 @@ export default function SubmitComplaintPage() {
     setIsSubmitting(true)
     try {
       const response = await complaintsApi.create(data)
-      setTrackingNumber(response.data.trackingNumber)
-      setStep(3)
-      toast.success("Complaint submitted successfully!")
+      
+      const trackingNum = response.data?.trackingNumber || response.data?.trackingNumber
+      if (trackingNum) {
+        setTrackingNumber(trackingNum)
+        setStep(3)
+        toast.success("Complaint submitted successfully!")
+      } else {
+        throw new Error("Invalid response format")
+      }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to submit complaint")
+      console.error("Submit error:", error)
+      const errorMessage = error.response?.data?.message || error.message || "Failed to submit complaint"
+      toast.error(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
@@ -53,8 +61,13 @@ export default function SubmitComplaintPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-bold text-gray-900">Submit a Complaint</h1>
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link to="/" className="text-gray-600 hover:text-gray-900">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h1 className="text-xl font-bold text-gray-900">Submit a Complaint</h1>
+          </div>
         </div>
       </header>
 

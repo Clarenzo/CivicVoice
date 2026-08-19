@@ -60,12 +60,19 @@ export const authApi = {
     api.post("/auth/login", data),
   
   getProfile: () => api.get("/auth/profile"),
+
+  refresh: (refreshToken: string) =>
+    api.post("/auth/refresh", { refreshToken}),
 }
 
 export const complaintsApi = {
   create: (data: any) => api.post("/complaints", data),
+
+  getMy: (params?: any) => api.get("/complaints/my", { params }),
   
   getAll: (params?: any) => api.get("/complaints", { params }),
+
+  getStats:() => api.get("/complaints/stats"),
   
   getById: (id: string) => api.get(`/complaints/${id}`),
   
@@ -74,6 +81,13 @@ export const complaintsApi = {
   
   updateStatus: (id: string, data: any) => 
     api.put(`/complaints/${id}/status`, data),
+
+  assign: (id: string, assignedToId: string) =>
+    api.put(`/complaints/${id}/assign`, { assignedToId }),
+
+  delete: (id: string) => api.delete(`/complaints/${id}`),
+
+  restore: (id: string) => api.put(`/complaints/${id}/restore`),
 }
 
 export const categoriesApi = {

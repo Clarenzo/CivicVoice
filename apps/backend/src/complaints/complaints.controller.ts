@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, Ip} from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, Ip} from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { ComplaintsService } from "./complaints.service";
@@ -19,7 +19,15 @@ export class ComplaintsController {
         @Ip() ip: string,
     ) {
         const userId = req.user?.id;
-        return this.complaintsService.create(createComplaintDto, userId, ip);
+        const userRole = req.user?.role;
+
+        const complaint = await this.complaintsService.create(createComplaintDto, userId, userRole, ip);
+
+        return {
+            success: true,
+            data: complaint,
+            message: "Complaint submitted successfully",
+        };
     }
 
     @Get("track/:trackingNumber")
@@ -28,6 +36,22 @@ export class ComplaintsController {
     @ApiResponse({ status: 404, description: "Complaint not found" })
     async track(@Param("trackingNumber") trackingNumber: string) {
         return this.complaintsService.findByTrackingNumber(trackingNumber);
+    }
+
+    @Get("my")
+    @UseGuards(AuthGuard("jwt"))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get my complaints (citizen)" })
+    async findMyComplaints(@Request() req: AuthenticatedRequest, @Query() query: ComplaintQueryDto) {
+        return this.complaintsService.findMyComplaints(req.user.id, query);
+    }
+
+    @Get("stats")
+    @UseGuards(AuthGuard("jwt"))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get complaint statistics (admin)" })
+    async getStats() {
+        return this.complaintsService.getStats();
     }
 
     @Get()
@@ -64,5 +88,21 @@ export class ComplaintsController {
     @ApiOperation({ summary: "Assign complaint to handler (admin)" })
     async assign(@Param("id") id: string, @Body("assignedToId") assignedToId: string) {
         return this.complaintsService.assignTo(id, assignedToId);
+    }
+
+    @Delete(":id")
+    @UseGuards(AuthGuard("jwt"))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Soft delete a complaint (move to trash)" })
+    async softDelete(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
+        return this.complaintsService.softDelete(id, req.user.id);
+    }
+
+    @Put(":id/restore")
+    @UseGuards(AuthGuard("jwt"))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Restore a deleted complaint from trash" })
+    async restore(@Param("id") id: string) {
+        return this.complaintsService.restore(id);
     }
 }
