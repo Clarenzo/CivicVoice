@@ -58,11 +58,21 @@ export const authApi = {
   
   login: (data: { email: string; password: string }) =>
     api.post("/auth/login", data),
+
+  logout: (refreshToken: string) =>
+    api.post("/auth/logout", { refreshToken }),
   
   getProfile: () => api.get("/auth/profile"),
 
   refresh: (refreshToken: string) =>
-    api.post("/auth/refresh", { refreshToken}),
+    api.post("/auth/refresh", { refreshToken }),
+}
+
+export const feedbackApi = {
+  create: (data: { title: string; description: string; category: string; language?: string }) =>
+    api.post("/feedback", data),
+
+  getAll: () => api.get("/feedback"),
 }
 
 export const complaintsApi = {
@@ -81,6 +91,9 @@ export const complaintsApi = {
   
   updateStatus: (id: string, data: any) => 
     api.put(`/complaints/${id}/status`, data),
+
+  updatePriority: (id: string, priority: string) => 
+    api.put(`/complaints/${id}/priority`, { priority }),
 
   assign: (id: string, assignedToId: string) =>
     api.put(`/complaints/${id}/assign`, { assignedToId }),

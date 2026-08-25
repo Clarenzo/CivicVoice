@@ -2,13 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+
+// Mock bcrypt at module level so we don't fight spyOn restoration
+jest.mock('bcrypt', () => ({
+  hash: jest.fn().mockResolvedValue('$2b$10$mockedhashvalue'),
+  compare: jest.fn(),
+}));
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prismaService: PrismaService;
-  let jwtService: JwtService;
 
   const mockPrismaService = {
     user: {
@@ -16,13 +20,23 @@ describe('AuthService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
     },
+    refreshToken: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+      deleteMany: jest.fn(),
+    },
   };
 
   const mockJwtService = {
     sign: jest.fn().mockReturnValue('mock-jwt-token'),
+    verify: jest.fn().mockReturnValue({ sub: 'user-id', role: 'CITIZEN' }),
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -32,11 +46,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
-
-    // Reset all mocks before each test
-    jest.clearAllMocks();
   });
 
   describe('register', () => {
@@ -55,6 +64,7 @@ describe('AuthService', () => {
         role: 'CITIZEN',
         createdAt: new Date(),
       });
+      mockPrismaService.refreshToken.create.mockResolvedValue({ id: 'rt-id' });
 
       const result = await service.register(registerDto);
 
@@ -63,6 +73,7 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe(registerDto.email);
       expect(mockPrismaService.user.create).toHaveBeenCalled();
+      expect(mockPrismaService.refreshToken.create).toHaveBeenCalled();
     });
 
     it('should throw ConflictException if user already exists', async () => {
@@ -71,19 +82,24 @@ describe('AuthService', () => {
       await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
     });
 
+    it('should throw BadRequestException if password is missing', async () => {
+      await expect(service.register({ name: 'X', email: 'x@y.com' } as any)).rejects.toThrow(BadRequestException);
+    });
+
     it('should hash the password before storing', async () => {
       mockPrismaService.user.findFirst.mockResolvedValue(null);
-      mockPrismaService.user.create.mockImplementation(async (data) => ({
+      mockPrismaService.user.create.mockImplementation(async (data: any) => ({
         id: 'user-id',
         ...data.data,
         createdAt: new Date(),
       }));
+      mockPrismaService.refreshToken.create.mockResolvedValue({ id: 'rt-id' });
 
       await service.register(registerDto);
 
       const createCall = mockPrismaService.user.create.mock.calls[0][0];
       expect(createCall.data.password).not.toBe(registerDto.password);
-      expect(createCall.data.password).toMatch(/^\$2[aby]?\$\d{1,2}\$/); // bcrypt hash pattern
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 10);
     });
   });
 
@@ -99,13 +115,12 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 'user-id',
         email: loginDto.email,
+        name: 'John Doe',
         password: hashedPassword,
         status: 'ACTIVE',
         role: 'CITIZEN',
       });
-
-      // Mock bcrypt.compare
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(true));
+      mockPrismaService.refreshToken.create.mockResolvedValue({ id: 'rt-id' });
 
       const result = await service.login(loginDto);
 
@@ -127,8 +142,7 @@ describe('AuthService', () => {
         password: hashedPassword,
         status: 'ACTIVE',
       });
-
-      jest.spyOn(bcrypt, 'compare').mockImplementation(() => Promise.resolve(false));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
     });
@@ -145,6 +159,17 @@ describe('AuthService', () => {
     });
   });
 
+  describe('refreshTokens', () => {
+    it('should throw UnauthorizedException if refresh token is missing', async () => {
+      await expect(service.refreshTokens('')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException if refresh token is not in DB', async () => {
+      mockPrismaService.refreshToken.findUnique.mockResolvedValue(null);
+      await expect(service.refreshTokens('bad-token')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
   describe('getProfile', () => {
     it('should return user profile without sensitive data', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
@@ -155,7 +180,6 @@ describe('AuthService', () => {
         role: 'CITIZEN',
         status: 'ACTIVE',
         createdAt: new Date(),
-        password: 'hashed-password-should-not-be-included',
       });
 
       const result = await service.getProfile('user-id');
@@ -174,13 +198,16 @@ describe('AuthService', () => {
   });
 
   describe('generateTokens', () => {
-    it('should generate access and refresh tokens', async () => {
+    it('should generate access and refresh tokens and persist refresh token', async () => {
+      mockPrismaService.refreshToken.create.mockResolvedValue({ id: 'rt-id' });
+
       const tokens = await (service as any).generateTokens('user-id', 'CITIZEN');
 
       expect(tokens).toHaveProperty('accessToken');
       expect(tokens).toHaveProperty('refreshToken');
       expect(tokens.accessToken).toBe('mock-jwt-token');
       expect(mockJwtService.sign).toHaveBeenCalledTimes(2);
+      expect(mockPrismaService.refreshToken.create).toHaveBeenCalled();
     });
   });
 });

@@ -2,10 +2,14 @@ import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
+import { Roles } from "../auth/roles.decorator";
+import { RolesGuard } from "../auth/guards/role.guard";
+import { Role } from "@prisma/client";
 
 @ApiTags("users")
 @Controller("users")
-@UseGuards(AuthGuard("jwt"))
+@UseGuards(AuthGuard("jwt"), RolesGuard)
+@Roles(Role.SYSTEM_ADMIN, Role.AGENCY_ADMIN, Role.DEPARTMENT_ADMIN)
 @ApiBearerAuth()
 export class UsersController {
     constructor(private usersService: UsersService) {}

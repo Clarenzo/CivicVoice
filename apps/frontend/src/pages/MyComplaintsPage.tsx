@@ -13,7 +13,7 @@ export default function MyComplaintsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["my-complaints"],
-    queryFn: () => complaintsApi.getAll().then(res => res.data),
+    queryFn: () => complaintsApi.getMy().then(res => res.data),
   })
 
   const deleteMutation = useMutation({
@@ -91,8 +91,8 @@ export default function MyComplaintsPage() {
                   <th className="pb-3 font-medium text-gray-500">Title</th>
                   <th className="pb-3 font-medium text-gray-500">Status</th>
                   <th className="pb-3 font-medium text-gray-500">Priority</th>
-                  <th className="pb-3 font-medium text-gray-500">Priority</th>
                   <th className="pb-3 font-medium text-gray-500">Submitted</th>
+                  <th className="pb-3 font-medium text-gray-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -114,14 +114,13 @@ export default function MyComplaintsPage() {
                     </td>
                     <td className="py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        complaint.status === "RESOLVED" ? "bg-green-100 text-green-700" :
+                        complaint.status === "RESOLVED" || complaint.status === "CLOSED" ? "bg-green-100 text-green-700" :
                         complaint.status === "IN_PROGRESS" ? "bg-orange-100 text-orange-700" :
                         complaint.status === "SUBMITTED" ? "bg-blue-100 text-blue-700" :
-                        complaint.status === "UNDER_REVIEW" ? "bg-yellow-100 text-yellow-700" :
-                        complaint.status === "CLOSED" ? "bg-gray-100 text-gray-700" :
+                        complaint.status === "UNDER_REVIEW" || complaint.status === "PENDING_INFO" ? "bg-yellow-100 text-yellow-700" :
                         "bg-red-100 text-red-700"
                       }`}>
-                        {complaint.status.replace("_", " ")}
+                        {complaint.status.replace(/_/g, " ")}
                       </span>
                     </td>
                     <td className="py-4">
@@ -137,8 +136,8 @@ export default function MyComplaintsPage() {
                     <td className="py-4 text-gray-600">
                       {format(new Date(complaint.createdAt), "PPP")}
                     </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-1">
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -155,7 +154,7 @@ export default function MyComplaintsPage() {
                           title="Delete"
                           disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="w-4 h-4"/>
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

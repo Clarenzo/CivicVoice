@@ -19,9 +19,9 @@ import AdminLayout from "./components/AdminLayout"
 import AdminDashboardPage from "./pages/AdminDashboardPage"
 import AdminComplaintDetailPage from "./pages/AdminComplaintDetailPage"
 
-// Helper component to determine which dashboard to show
+// Helper component to redirect unauthenticated users
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
 
   if (!isAuthenticated) {
     return <HomePage />
@@ -34,7 +34,7 @@ function App() {
   const { isAuthenticated, user } = useAuthStore()
 
   // Determine if user is admin
-  const isAdmin = user?.role && ["SYSTEM_ADMIN", "AGENCY_ADMIN", "DEPARTMENT_ADMIN", "HANDLER"].includes(user.role)
+  const isAdmin = !!user?.role && ["SYSTEM_ADMIN", "AGENCY_ADMIN", "DEPARTMENT_ADMIN", "HANDLER"].includes(user.role)
 
   return (
     <Routes>
@@ -56,17 +56,19 @@ function App() {
         <Route path="complaints/:id" element={isAdmin ? <AdminComplaintDetailPage /> : <ComplaintDetailPage />} />
       </Route>
 
-      {/* Admin Dashboard Routes (separate prefix for clarity) */}
+      {/* Admin Dashboard Routes (clean /admin prefix) */}
       <Route path="/admin" element={
         isAuthenticated && isAdmin ? <AdminLayout /> : <HomePage />
       }>
         <Route index element={<AdminDashboardPage />} />
-        <Route path="complaints" element={<AdminDashboardPage />} />
         <Route path="complaints/:id" element={<AdminComplaintDetailPage />} />
         <Route path="analytics" element={<ComingSoon title="Analytics" />} />
         <Route path="users" element={<ComingSoon title="User Management" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
       </Route>
+
+      {/* Catch all → Home */}
+      <Route path="*" element={<HomePage />} />
     </Routes>
   )
 }

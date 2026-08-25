@@ -7,7 +7,7 @@ import { format } from "date-fns"
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["my-complaints"],
-    queryFn: () => complaintsApi.getAll().then(res => res.data),
+    queryFn: () => complaintsApi.getMy().then(res => res.data),
   })
 
   const stats = {
@@ -25,7 +25,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -92,7 +92,7 @@ export default function DashboardPage() {
             {data.complaints.slice(0, 5).map((complaint: any) => (
               <Link
                 key={complaint.id}
-                to={`/track?tracking=${complaint.trackingNumber}`}
+                to={`/dashboard/complaints/${complaint.id}`}
                 className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <div>
@@ -102,12 +102,14 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  complaint.status === "RESOLVED" ? "bg-green-100 text-green-700" :
+                  complaint.status === "RESOLVED" || complaint.status === "CLOSED" ? "bg-green-100 text-green-700" :
                   complaint.status === "IN_PROGRESS" ? "bg-orange-100 text-orange-700" :
                   complaint.status === "SUBMITTED" ? "bg-blue-100 text-blue-700" :
+                  complaint.status === "UNDER_REVIEW" || complaint.status === "PENDING_INFO" ? "bg-yellow-100 text-yellow-700" :
+                  complaint.status === "ESCALATED" || complaint.status === "REJECTED" ? "bg-red-100 text-red-700" :
                   "bg-gray-100 text-gray-700"
                 }`}>
-                  {complaint.status.replace("_", " ")}
+                  {complaint.status.replace(/_/g, " ")}
                 </span>
               </Link>
             ))}

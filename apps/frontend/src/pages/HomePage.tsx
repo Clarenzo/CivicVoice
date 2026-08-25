@@ -1,42 +1,86 @@
-import { Link } from "react-router-dom"
-import { MessageSquare, Search, FileCheck, Shield, Globe } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { useAuthStore } from "../store/authStore"
+import { MessageSquare, Search, FileCheck, Shield, Globe, LogOut } from "lucide-react"
+import { authApi } from "../lib/api"
 
 export default function HomePage() {
+  const navigate = useNavigate()
+  const { isAuthenticated, user, refreshToken, logout } = useAuthStore()
+
+  const handleLogout = async () => {
+    try {
+      if (refreshToken) {
+        await authApi.logout(refreshToken)
+      }
+    } catch {
+      // ignore
+    }
+    logout()
+    navigate("/")
+  }
+
+  // Determine dashboard path based on role
+  const dashboardPath = user?.role && ["SYSTEM_ADMIN", "AGENCY_ADMIN", "DEPARTMENT_ADMIN", "HANDLER"].includes(user.role)
+    ? "/admin"
+    : "/dashboard"
+  
+
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
+            <Link to="/" className="flex items-center gap-2">
               <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">CivicVoice</span>
-            </div>
-            <nav className="flex items-center gap-4">
+            </Link>
+            <nav className="flex items-center gap-3 sm:gap-4">
               <Link to="/track" className="text-gray-600 hover:text-gray-900 font-medium">
                 Track Complaint
               </Link>
-              <Link to="/submit" className="btn-primary">
+              <Link to="/submit" className="btn-primary text-sm sm:text-base">
                 Submit Complaint
               </Link>
-              <Link to="/login" className="btn-secondary">
-                Sign In
-              </Link>
+              {isAuthenticated && user ? (
+                <>
+                  <Link
+                    to={dashboardPath}
+                    className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-primary-600 font-medium transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-medium">{user.name?.[0]?.toUpperCase()}</span>
+                    </div>
+                    <span className="text-sm">{user.name}</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1 text-gray-600 hover:text-red-600 font-medium text-sm transition-colors"
+                    title = "Sign out"
+                  >
+                    <LogOut className="w-4 h-4 sm:hidden" />
+                    <span className="hidden sm:inline">Logout</span>
+                  </button>
+                </>
+              ): (
+                <Link to="/login" className="btn-secondary text-sm sm:text-base">
+                  Sign In
+                </Link>
+              )}
             </nav>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">
-            Your Voice. Your Government.<br />
+      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-16 sm:py-20 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
+            Your Voice. Your Government.<br className="hidden sm:block" />
             Every Complaint Heard.
           </h1>
-          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
             Submit complaints, track their progress, and help improve public services.
             Your feedback matters to us.
           </p>
@@ -52,9 +96,9 @@ export default function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+      <section className="py-12 sm:py-16 bg-white px-4">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -88,9 +132,9 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Use CivicVoice?</h2>
+      <section className="py-12 sm:py-16 bg-gray-50 px-4">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">Why Use CivicVoice?</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="card">
               <Search className="w-10 h-10 text-primary-600 mb-4" />
@@ -125,8 +169,8 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <footer className="bg-gray-900 text-gray-300 py-12 px-4">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -142,7 +186,11 @@ export default function HomePage() {
               <ul className="space-y-2 text-sm">
                 <li><Link to="/submit" className="hover:text-white">Submit Complaint</Link></li>
                 <li><Link to="/track" className="hover:text-white">Track Complaint</Link></li>
-                <li><Link to="/login" className="hover:text-white">Sign In</Link></li>
+                {isAuthenticated ? (
+                  <li><Link to={dashboardPath} className="hover:text-white">Dashboard</Link></li>
+                ) : (
+                  <li><Link to="/login" className="hover:text-white">Sign In</Link></li>
+                )}
               </ul>
             </div>
             <div>

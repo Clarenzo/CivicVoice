@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateComplaintDto, UpdateComplaintStatusDto } from "./dto";
+import { CreateComplaintDto, UpdateComplaintStatusDto, UpdatePriorityDto } from "./dto";
 import { ComplaintStatus, Priority, Role } from "@prisma/client";
-import { title } from "process";
+
+const ADMIN_ROLES: Role[] = [Role.SYSTEM_ADMIN, Role.AGENCY_ADMIN, Role.DEPARTMENT_ADMIN, Role.HANDLER];
 
 @Injectable()
 export class ComplaintsService {
@@ -50,7 +51,7 @@ export class ComplaintsService {
                     complaintId: complaint.id,
                     status: "SUBMITTED",
                     note: "Complaint submitted",
-                    changedById: userId || complaint.id,
+                    changedById: userId || null,
                 },
             });
 
@@ -216,6 +217,24 @@ export class ComplaintsService {
         return complaint;
     }
 
+    /**
+     * Find complaint by ID with ownership check:
+     * - Admins/handlers can view any complaint
+     * - Citizens can only view their own complaints
+     */
+    async findOneForUser(id: string, userId: string, userRole: Role) {
+        const complaint = await this.findOne(id);
+
+        const isAdmin = ADMIN_ROLES.includes(userRole);
+        const isOwner = complaint.citizenId === userId;
+
+        if (!isAdmin && !isOwner) {
+            throw new ForbiddenException("You do not have access to this complaint");
+        }
+
+        return complaint;
+    }
+
     async findByTrackingNumber(trackingNumber: string) {
         const complaint = await this.prisma.complaint.findUnique({
             where: { trackingNumber },
@@ -303,21 +322,57 @@ export class ComplaintsService {
         });
     }
 
-    /**
-     * Soft delete a complaint (moves to trash)
-     * Actually deletes after 30 days via a schedules job
-     */
-    async softDelete(id: string, userId: string) {
-        const complaint = await this.prisma.complaint.findUnique({ where: { id} });
+    async updatePriority(id: string, updateDto: UpdatePriorityDto, userId: string) {
+        const complaint = await this.prisma.complaint.findUnique({ where: { id } });
 
         if (!complaint) {
             throw new NotFoundException("Complaint not found");
         }
 
-        // Only allow deletion by the citizen who submitted or admin
-        // For now, only allow if user owns the complaint
-        if (complaint.citizenId !== userId) {
-            throw new ForbiddenException("You can only delete your owncomplaints");
+        const updatedComplaint = await this.prisma.complaint.update({
+            where: { id },
+            data: {
+                priority: updateDto.priority,
+            },
+        });
+
+        // Log the priority change in status history as a note
+        const priorityLabels: Record<string, string> = {
+            LOW: "Low",
+            MEDIUM: "Medium",
+            HIGH: "High",
+            CRITICAL: "Critical",
+        };
+
+        await this.prisma.statusChange.create({
+            data: {
+                complaintId: id,
+                status: complaint.status,
+                note: `Priority changed to ${priorityLabels[updateDto.priority] || updateDto.priority}`,
+                changedById: userId,
+            },
+        });
+
+        return updatedComplaint;
+    }
+
+    /**
+     * Soft delete a complaint (moves to trash).
+     * Owners can delete their own; admins can delete any.
+     * Actually deletes after 30 days via a scheduled job.
+     */
+    async softDelete(id: string, userId: string, userRole: Role) {
+        const complaint = await this.prisma.complaint.findUnique({ where: { id } });
+
+        if (!complaint) {
+            throw new NotFoundException("Complaint not found");
+        }
+
+        const isAdmin = ADMIN_ROLES.includes(userRole);
+        const isOwner = complaint.citizenId === userId;
+
+        if (!isAdmin && !isOwner) {
+            throw new ForbiddenException("You can only delete your own complaints");
         }
 
         return this.prisma.complaint.update({

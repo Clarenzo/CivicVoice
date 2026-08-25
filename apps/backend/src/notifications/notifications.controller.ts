@@ -1,7 +1,8 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -12,11 +13,7 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get notifications for current user' })
-  async findAll() {
-    return this.notificationsService.create({
-      type: 'IN_APP',
-      channel: 'test',
-      message: 'Notifications endpoint ready',
-    });
+  async findAll(@Request() req: AuthenticatedRequest) {
+    return this.notificationsService.findAllForUser(req.user.id);
   }
 }

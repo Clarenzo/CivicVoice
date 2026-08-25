@@ -1,9 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, Ip} from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, Ip } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { ComplaintsService } from "./complaints.service";
-import { CreateComplaintDto, UpdateComplaintStatusDto, ComplaintQueryDto } from "./dto";
+import { CreateComplaintDto, UpdateComplaintStatusDto, UpdatePriorityDto, ComplaintQueryDto } from "./dto";
 import { AuthenticatedRequest } from "../auth/authenticated-request";
+import { Roles } from "../auth/roles.decorator";
+import { RolesGuard } from "../auth/guards/role.guard";
+import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt.guard";
+import { Role } from "@prisma/client";
+
+// Roles that can manage/administer complaints
+const ADMIN_ROLES = [Role.SYSTEM_ADMIN, Role.AGENCY_ADMIN, Role.DEPARTMENT_ADMIN, Role.HANDLER];
 
 @ApiTags("complaints")
 @Controller("complaints")
@@ -11,13 +18,16 @@ export class ComplaintsController {
     constructor(private complaintsService: ComplaintsService) {}
 
     @Post()
-    @ApiOperation({ summary: "Submit a new complaint (public)" })
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: "Submit a new complaint (public — optional auth)" })
     @ApiResponse({ status: 201, description: "Complaint submitted successfully" })
     async create(
         @Body() createComplaintDto: CreateComplaintDto,
         @Request() req: AuthenticatedRequest,
         @Ip() ip: string,
     ) {
+        // This endpoint is intentionally public. If a user is logged in,
+        // their userId is attached; otherwise it works anonymously.
         const userId = req.user?.id;
         const userRole = req.user?.role;
 
@@ -47,7 +57,8 @@ export class ComplaintsController {
     }
 
     @Get("stats")
-    @UseGuards(AuthGuard("jwt"))
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(...ADMIN_ROLES)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Get complaint statistics (admin)" })
     async getStats() {
@@ -55,7 +66,8 @@ export class ComplaintsController {
     }
 
     @Get()
-    @UseGuards(AuthGuard("jwt"))
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(...ADMIN_ROLES)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Get all complaints (admin/handler)" })
     async findAll(@Query() query: ComplaintQueryDto) {
@@ -65,13 +77,14 @@ export class ComplaintsController {
     @Get(":id")
     @UseGuards(AuthGuard("jwt"))
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Get complaint by ID (admin/handler)" })
-    async findOne(@Param("id") id: string) {
-        return this.complaintsService.findOne(id);
+    @ApiOperation({ summary: "Get complaint by ID (owner or admin/handler)" })
+    async findOne(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
+        return this.complaintsService.findOneForUser(id, req.user.id, req.user.role as Role);
     }
 
     @Put(":id/status")
-    @UseGuards(AuthGuard("jwt"))
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(...ADMIN_ROLES)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Update complaint status (admin/handler)" })
     async updateStatus(
@@ -82,8 +95,23 @@ export class ComplaintsController {
         return this.complaintsService.updateStatus(id, updateDto, req.user.id);
     }
 
+    @Put("id/priority")
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(...ADMIN_ROLES)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update complaint priority (admin/handler)" })
+    async updatePriority(
+        @Param("id") id: string,
+        @Body() updateDto: UpdatePriorityDto,
+        @Request() req: AuthenticatedRequest,
+    ) {
+        await this.complaintsService.updatePriority(id, updateDto, req.user.id);
+        return this.complaintsService.findOne(id);
+    }
+
     @Put(":id/assign")
-    @UseGuards(AuthGuard("jwt"))
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(Role.SYSTEM_ADMIN, Role.AGENCY_ADMIN, Role.DEPARTMENT_ADMIN)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Assign complaint to handler (admin)" })
     async assign(@Param("id") id: string, @Body("assignedToId") assignedToId: string) {
@@ -93,15 +121,16 @@ export class ComplaintsController {
     @Delete(":id")
     @UseGuards(AuthGuard("jwt"))
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Soft delete a complaint (move to trash)" })
+    @ApiOperation({ summary: "Soft delete a complaint (owner or admin)" })
     async softDelete(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
-        return this.complaintsService.softDelete(id, req.user.id);
+        return this.complaintsService.softDelete(id, req.user.id, req.user.role as Role);
     }
 
     @Put(":id/restore")
-    @UseGuards(AuthGuard("jwt"))
+    @UseGuards(AuthGuard("jwt"), RolesGuard)
+    @Roles(...ADMIN_ROLES)
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Restore a deleted complaint from trash" })
+    @ApiOperation({ summary: "Restore a deleted complaint from trash (admin)" })
     async restore(@Param("id") id: string) {
         return this.complaintsService.restore(id);
     }

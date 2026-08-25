@@ -16,7 +16,7 @@ describe('ComplaintsService', () => {
       findFirst: jest.fn(),
       count: jest.fn(),
     },
-    complaintStatus: {
+    statusChange: {
       create: jest.fn(),
     },
   };
@@ -53,14 +53,14 @@ describe('ComplaintsService', () => {
         status: 'SUBMITTED',
         createdAt: new Date(),
       });
-      mockPrismaService.complaintStatus.create.mockResolvedValue({});
+      mockPrismaService.statusChange.create.mockResolvedValue({});
 
       const result = await service.create(createComplaintDto);
 
       expect(result).toHaveProperty('trackingNumber');
       expect(result.trackingNumber).toMatch(/^CV-\d{4}-\d{6}$/);
       expect(mockPrismaService.complaint.create).toHaveBeenCalled();
-      expect(mockPrismaService.complaintStatus.create).toHaveBeenCalled();
+      expect(mockPrismaService.statusChange.create).toHaveBeenCalled();
     });
 
     it('should generate sequential tracking numbers', async () => {
@@ -71,7 +71,7 @@ describe('ComplaintsService', () => {
         trackingNumber: 'CV-2026-000001',
         ...createComplaintDto,
       });
-      mockPrismaService.complaintStatus.create.mockResolvedValue({});
+      mockPrismaService.statusChange.create.mockResolvedValue({});
 
       await service.create(createComplaintDto);
 
@@ -84,13 +84,15 @@ describe('ComplaintsService', () => {
         trackingNumber: 'CV-2026-000002',
         ...createComplaintDto,
       });
-      mockPrismaService.complaintStatus.create.mockResolvedValue({});
+      mockPrismaService.statusChange.create.mockResolvedValue({});
 
       const result2 = await service.create(createComplaintDto);
 
       expect(result2.trackingNumber).toBe('CV-2026-000002');
     });
   });
+
+
 
   describe('findOne', () => {
     it('should return a complaint by id', async () => {
@@ -191,12 +193,12 @@ describe('ComplaintsService', () => {
         ...existingComplaint,
         status: 'UNDER_REVIEW',
       });
-      mockPrismaService.complaintStatus.create.mockResolvedValue({});
+      mockPrismaService.statusChange.create.mockResolvedValue({});
 
       const result = await service.updateStatus('complaint-id', updateDto, 'user-id');
 
       expect(result.status).toBe('UNDER_REVIEW');
-      expect(mockPrismaService.complaintStatus.create).toHaveBeenCalled();
+      expect(mockPrismaService.statusChange.create).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException for non-existent complaint', async () => {

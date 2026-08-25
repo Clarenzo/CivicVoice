@@ -33,6 +33,12 @@ export class AuthController {
     return this.authService.refreshTokens(refreshToken);
   }
 
+  @Post("logout")
+  @ApiOperation({ summary: "Logout (revoke refresh token)" })
+  async logout(@Body("refreshToken") refreshToken: string) {
+    return this.authService.logout(refreshToken);
+  }
+
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

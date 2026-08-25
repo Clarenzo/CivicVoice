@@ -32,7 +32,9 @@ export default function LoginPage() {
       
       login(user, accessToken, refreshToken)
       toast.success(`Welcome back, ${user.name}!`)
-      navigate("/dashboard")
+
+      const isAdmin = ["SYSTEM_ADMIN", "AGENCY_ADMIN", "DEPARTMENT_ADMIN", "HANDLER"].includes(user.role)
+      navigate(isAdmin ? "/admin" : "/dashboard")
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Login failed")
     } finally {

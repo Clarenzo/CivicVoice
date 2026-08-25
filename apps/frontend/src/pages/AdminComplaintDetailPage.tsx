@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { 
   ArrowLeft, Clock, User, MapPin, Calendar, 
-  MessageSquare, CheckCircle, ChevronDown, Trash2, Mail, Phone
+  MessageSquare, CheckCircle, ChevronDown, Mail, Phone, AlertTriangle, XCircle
 } from 'lucide-react'
 import { complaintsApi } from '../lib/api'
 import { format } from 'date-fns'
@@ -27,12 +27,24 @@ const PRIORITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical', color: 'text-red-600 font-bold' },
 ]
 
+const STATUS_ICONS: Record<string, any> = {
+  SUBMITTED: Clock,
+  UNDER_REVIEW: AlertTriangle,
+  IN_PROGRESS: Clock,
+  PENDING_INFO: AlertTriangle,
+  ESCALATED: AlertTriangle,
+  RESOLVED: CheckCircle,
+  CLOSED: CheckCircle,
+  REJECTED: XCircle,
+}
+
 export default function AdminComplaintDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [newNote, setNewNote] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedPriority, setSelectedPriority] = useState("")
   const [resolution, setResolution] = useState('')
 
   const { data: complaint, isLoading, error } = useQuery({
@@ -46,6 +58,8 @@ export default function AdminComplaintDetailPage() {
       complaintsApi.updateStatus(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['complaint', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin-complaints'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
       toast.success('Status updated successfully')
       setSelectedStatus('')
       setResolution('')
@@ -56,14 +70,16 @@ export default function AdminComplaintDetailPage() {
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: () => complaintsApi.delete(id!),
+  const updatePriorityMutation = useMutation({
+    mutationFn: (priority: string) => complaintsApi.updatePriority(id!, priority),
     onSuccess: () => {
-      toast.success('Complaint moved to trash')
-      navigate('/admin/complaints')
+      queryClient.invalidateQueries({ queryKey: ['complaint', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin-complaints'] })
+      toast.success("Priority updated")
+      setSelectedPriority("")
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete complaint')
+      toast.error(error.response?.data?.message || "Failed to update priority")
     },
   })
 
@@ -79,10 +95,12 @@ export default function AdminComplaintDetailPage() {
     })
   }
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this complaint? It will be moved to trash for 30 days.')) {
-      deleteMutation.mutate()
+  const handlePriorityUpdate = () => {
+    if (!selectedPriority) {
+      toast.error("Please select a priority")
+      return
     }
+    updatePriorityMutation.mutate(selectedPriority)
   }
 
   if (isLoading) {
@@ -100,48 +118,51 @@ export default function AdminComplaintDetailPage() {
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Complaint Not Found</h2>
         <p className="text-gray-600 mb-4">The complaint you're looking for doesn't exist.</p>
-        <button onClick={() => navigate('/admin/complaints')} className="btn-secondary">
+        <button onClick={() => navigate('/admin')} className="btn-secondary">
           Go Back
         </button>
       </div>
     )
   }
 
+  const currentStatusCfg = STATUS_OPTIONS.find(s => s.value === complaint.status)
+  const currentPriorityCfg = PRIORITY_OPTIONS.find(p => p.value === complaint.priority)
+
   return (
     <div>
       {/* Header */}
       <div className="mb-6">
         <button 
-          onClick={() => navigate('/admin/complaints')} 
+          onClick={() => navigate('/admin')} 
           className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Complaints
         </button>
         
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{complaint.title}</h1>
-            <p className="text-gray-500 font-mono">{complaint.trackingNumber}</p>
+            <p className="text-gray-500 font-mono text-sm mt-1">{complaint.trackingNumber}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_OPTIONS.find(s => s.value === complaint.status)?.color}`}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${currentStatusCfg?.color || "bg-gray-100"}`}>
               {complaint.status.replace('_', ' ')}
             </span>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${PRIORITY_OPTIONS.find(p => p.value === complaint.priority)?.color}`}>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${currentPriorityCfg?.color || "bg-gray-100"}`}>
               {complaint.priority}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Description */}
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">Description</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{complaint.description}</p>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{complaint.description}</p>
           </div>
 
           {/* Status Update */}
@@ -213,39 +234,78 @@ export default function AdminComplaintDetailPage() {
             </div>
           </div>
 
+          {/* Priority Update */}
+          <div className="card">
+            <h2 className='text-lg font-semibold mb-4'>Update Priority</h2>
+            <p className='text-sm text-gray-600 mb-4'>
+              Set the priority level based on severity so issues can receive appropriate attention.
+            </p>
+
+            <div className='flex flex-cil sm:flex-row gap-3'>
+              <div className='relative flex-1'>
+                <select
+                  value={selectedPriority}
+                  onChange={(e) => setSelectedPriority(e.target.value)}
+                  className='input-field appearance-none pr-10'
+                >
+                  <option value="">Change priority...</option>
+                  {PRIORITY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className='absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none' />
+              </div>
+              <button
+                onClick={handlePriorityUpdate}
+                disabled={!selectedPriority || updatePriorityMutation.isPending}
+                className='btn-primary whitespace-nowrap'
+              >
+                {updatePriorityMutation.isPending ? "Updating..." : "Update Priority"}
+              </button>
+            </div>
+          </div>
+
           {/* Status History */}
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">Status History</h2>
-            <div className="space-y-4">
-              {complaint.statusHistory?.map((item: any, index: number) => (
-                <div key={item.id} className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${STATUS_OPTIONS.find(s => s.value === item.status)?.color || 'bg-gray-100'}`}>
-                      <Clock className="w-4 h-4" />
+            {complaint.statusChanges && complaint.statusChanges.length > 0 ? (
+              <div className='space-y-0'>
+                {[...complaint.statusChanges].reverse().map((item: any, index: number, arr: any[]) => {
+                  const sOpt = STATUS_OPTIONS.find(s => s.value === item.status)
+                  const Icon = STATUS_ICONS[item.status] || Clock
+                  return (
+                    <div key={item.id} className='flex gap-4'>
+                      <div className='flex flex-col items-center'>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${sOpt?.color || "bg-gray-100"}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        {index < arr.length - 1 && (
+                          <div className='w-0.5 flex-1 bg-gray-200 my-1'></div>
+                        )}
+                      </div>
+                      <div className='flex-1 pb-4'>
+                        <div className='flex flex-wrap items-center gap-2 mb-1'>
+                          <span className='font-medium text-gray-900'>
+                            {sOpt?.label || item.status.replace(/_/g, " ")}
+                          </span>
+                          <span className='text-sm text-gray-500'>
+                            {format(new Date(item.createdAt), "PPp")}
+                          </span>
+                        </div>
+                        {item.note && (
+                          <p className='text-gray-600 text-sm'>{item.note}</p>
+                        )}
+                        <p className='text-xs text-gray-400 mt-1'>
+                          by {item.changedBy?.name || "System"}
+                        </p>
+                      </div>
                     </div>
-                    {index < complaint.statusHistory.length - 1 && (
-                      <div className="w-0.5 flex-1 bg-gray-200 my-1"></div>
-                    )}
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-gray-900">
-                        {STATUS_OPTIONS.find(s => s.value === item.status)?.label || item.status}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {format(new Date(item.createdAt), 'PPp')}
-                      </span>
-                    </div>
-                    {item.note && (
-                      <p className="text-gray-600 text-sm">{item.note}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">
-                      by {item.changedBy?.name || 'System'}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className='text-gray-500 text-sm'>No status updates yet.</p>
+            )}
           </div>
         </div>
 
@@ -256,7 +316,7 @@ export default function AdminComplaintDetailPage() {
             <h3 className="text-lg font-semibold mb-4">Submitter Info</h3>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                <User className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm text-gray-500">Name</p>
                   <p className="font-medium text-gray-900">
@@ -267,10 +327,10 @@ export default function AdminComplaintDetailPage() {
               
               {(complaint.submitterEmail || complaint.citizen?.email) && (
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <Mail className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-500">Email</p>
-                    <p className="text-gray-900">
+                    <p className="text-gray-900 break-all">
                       {complaint.submitterEmail || complaint.citizen?.email || '-'}
                     </p>
                   </div>
@@ -279,7 +339,7 @@ export default function AdminComplaintDetailPage() {
 
               {complaint.submitterPhone && (
                 <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <Phone className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-500">Phone</p>
                     <p className="text-gray-900">{complaint.submitterPhone}</p>
@@ -289,7 +349,7 @@ export default function AdminComplaintDetailPage() {
 
               {complaint.location && (
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm text-gray-500">Location</p>
                     <p className="text-gray-900">{complaint.location}</p>
@@ -298,7 +358,7 @@ export default function AdminComplaintDetailPage() {
               )}
 
               <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+                <Calendar className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm text-gray-500">Submitted</p>
                   <p className="text-gray-900">{format(new Date(complaint.createdAt), 'PPP')}</p>
@@ -318,23 +378,19 @@ export default function AdminComplaintDetailPage() {
                   <p className="font-medium text-gray-900">{complaint.department.name}</p>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Actions */}
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-4">Actions</h3>
-            <button
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              {deleteMutation.isPending ? 'Deleting...' : 'Move to Trash'}
-            </button>
-            <p className="text-xs text-gray-500 text-center mt-2">
-              Will be permanently deleted after 30 days
-            </p>
+              {complaint.assignedTo && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-medium">{complaint.assignedTo.name?.[0]?.toUpperCase()}</span>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500'>Assigned To</p>
+                    <p className='font-medium text-gray-900'>{complaint.assignedTo.name}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Attachments */}

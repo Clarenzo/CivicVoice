@@ -85,6 +85,12 @@ export class UpdateComplaintStatusDto {
     resolution?: string;
 }
 
+export class UpdatePriorityDto {
+    @ApiProperty({ enum: Priority })
+    @IsEnum(Priority)
+    priority!: Priority;
+}
+
 export class ComplaintQueryDto {
     @ApiPropertyOptional()
     @IsOptional()

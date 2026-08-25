@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { FileText, Clock, CheckCircle, AlertCircle, Search, Filter, Eye, RefreshCw } from "lucide-react"
+import { FileText, Clock, CheckCircle, AlertCircle, Search, Eye, RefreshCw } from "lucide-react"
 import { complaintsApi } from "../lib/api"
 import { format } from "date-fns"
 
@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
     const [page, setPage] = useState(1)
 
     // Fetch stats
-    const { data: stats, isLoading: statsLoading } = useQuery({
+    const { data: stats } = useQuery({
         queryKey: ["admin-stats"],
         queryFn: () => complaintsApi.getStats().then(res => res.data),
     })
@@ -53,7 +53,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
                 <div className="card cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter("")}>
                     <div className="flex items-center justify-between">
                         <div>
@@ -82,7 +82,7 @@ export default function AdminDashboardPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500">In Progress</p>
-                            <p className="text-3xl font-bold text-blue-600">{stats?.inProgress || 0}</p>
+                            <p className="text-3xl font-bold text-orange-600">{stats?.inProgress || 0}</p>
                         </div>
                         <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
                             <AlertCircle className="w-6 h-6 text-orange-600" />
@@ -94,7 +94,7 @@ export default function AdminDashboardPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500">Resolved</p>
-                            <p className="text-3xl font-bold text-blue-600">{stats?.resolved || 0}</p>
+                            <p className="text-3xl font-bold text-green-600">{stats?.resolved || 0}</p>
                         </div>
                         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                             <CheckCircle className="w-6 h-6 text-green-600" />
@@ -198,7 +198,7 @@ export default function AdminDashboardPage() {
                                         </td>
                                         <td className="py-4">
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[complaint.status]?.bg} ${STATUS_COLORS[complaint.status]?.text}`}>
-                                                {complaint.status.replace("_", "")}
+                                                {complaint.status.replace(/_/g, " ")}
                                             </span>
                                         </td>
                                         <td className="py-4">
